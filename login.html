@@ -74,7 +74,7 @@
     // Se já estiver logado, vai direto pro sistema
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) window.location.replace('controle.html');
+      if (session) window.location.replace('movimentacoes.html');
     })();
 
     $('form-login').addEventListener('submit', async (e) => {
@@ -95,7 +95,7 @@
         return;
       }
 
-      window.location.replace('controle.html');
+      window.location.replace('movimentacoes.html');
     });
   </script>
 </body>
