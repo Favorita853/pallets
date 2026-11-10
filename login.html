@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — Controle de Paletes</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#eef4ff', 100:'#dbe6fe', 500:'#4f7cff', 600:'#3a63e0', 700:'#2c4fb8' }
+          },
+          fontFamily: { sans: ['Inter','system-ui','sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    html, body { font-family: 'Inter', system-ui, sans-serif; }
+    body { background: linear-gradient(135deg, #f8fafc 0%, #eef4ff 100%); }
+    .fade-in { animation: fadeIn .35s ease both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4 text-slate-800">
+
+  <div class="w-full max-w-md bg-white/90 backdrop-blur rounded-2xl shadow-xl shadow-brand-500/10 p-8 fade-in">
+    <div class="text-center mb-8">
+      <div class="mx-auto w-14 h-14 rounded-2xl bg-brand-500 flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-brand-500/30">
+        P
+      </div>
+      <h1 class="mt-4 text-2xl font-bold text-slate-800">Controle de Paletes</h1>
+      <p class="text-sm text-slate-500 mt-1">Faça login para continuar</p>
+    </div>
+
+    <form id="form-login" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">E-mail</label>
+        <input id="email" type="email" required autocomplete="email"
+          class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-600 mb-1">Senha</label>
+        <input id="password" type="password" required autocomplete="current-password"
+          class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition" />
+      </div>
+      <button type="submit" id="btn-login"
+        class="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold shadow-lg shadow-brand-500/30 transition disabled:opacity-60">
+        Entrar
+      </button>
+      <p id="login-msg" class="text-sm text-center text-red-600 min-h-[20px]"></p>
+    </form>
+  </div>
+
+  <script>
+    // ======================================================
+    // CONFIGURAÇÃO — troque aqui
+    // ======================================================
+    const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
+    const SUPABASE_ANON_KEY = "SUA-ANON-KEY-AQUI";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const $ = (id) => document.getElementById(id);
+    const msg = $('login-msg');
+    const btn = $('btn-login');
+
+    // Se já estiver logado, vai direto pro sistema
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) window.location.replace('movimentacoes.html');
+    })();
+
+    $('form-login').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Entrando...';
+
+      const email = $('email').value.trim();
+      const password = $('password').value;
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        msg.textContent = error.message;
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+        return;
+      }
+
+      window.location.replace('movimentacoes.html');
+    });
+  </script>
+</body>
+</html>
