@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Movimentações — Controle de Paletes</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#eef4ff', 100:'#dbe6fe', 500:'#4f7cff', 600:'#3a63e0', 700:'#2c4fb8' }
+          },
+          fontFamily: { sans: ['Inter','system-ui','sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    html, body { font-family: 'Inter', system-ui, sans-serif; }
+    body { background: linear-gradient(135deg, #f8fafc 0%, #eef4ff 100%); }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+    .fade-in { animation: fadeIn .35s ease both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+
+<body class="min-h-screen text-slate-800">
+
+  <!-- ===== Loading overlay (controlado por JS) ===== -->
+  <div id="loading" class="fixed inset-0 flex items-center justify-center bg-white z-50">
+    <div class="flex flex-col items-center gap-3">
+      <div class="w-10 h-10 rounded-full border-4 border-brand-100 border-t-brand-500 animate-spin"></div>
+      <p class="text-sm text-slate-500">Carregando...</p>
+    </div>
+  </div>
+
+  <!-- ===== Tela de erro (escondida por padrão) ===== -->
+  <div id="error-screen" class="hidden fixed inset-0 flex items-center justify-center bg-white z-50 p-6">
+    <div class="max-w-md w-full bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
+      <div class="w-12 h-12 mx-auto rounded-full bg-red-100 flex items-center justify-center text-red-600 text-2xl font-bold">!</div>
+      <h2 class="mt-4 font-bold text-red-800">Não foi possível carregar</h2>
+      <p id="error-msg" class="mt-2 text-sm text-red-700"></p>
+      <button onclick="location.reload()"
+        class="mt-4 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition">
+        Tentar novamente
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== App (escondido até autenticar) ===== -->
+  <div id="app-content" class="hidden">
+
+    <!-- Header -->
+    <header class="bg-white/80 backdrop-blur border-b border-slate-200 sticky top-0 z-10">
+      <div class="max-w-7xl mx-auto px-4 md:px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-brand-500 flex items-center justify-center text-white font-bold shadow-md shadow-brand-500/30">
+            P
+          </div>
+          <div>
+            <h1 class="font-bold text-slate-800 leading-tight">Controle de Paletes</h1>
+            <p class="text-xs text-slate-500">Movimentações</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="user-email" class="hidden sm:block text-sm text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full"></span>
+          <button id="btn-logout"
+            class="text-sm px-4 py-2 rounded-xl bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-700 font-medium transition">
+            Sair
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 md:px-6 py-8 space-y-8 fade-in">
+
+      <!-- SALDO -->
+      <section>
+        <h2 class="text-lg font-bold text-slate-800 mb-3">Saldo atual</h2>
+        <div id="saldo-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      </section>
+
+      <!-- FORM -->
+      <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+        <h2 class="text-lg font-bold text-slate-800 mb-4">Nova movimentação</h2>
+
+        <form id="form-mov" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">Modelo</label>
+            <select id="palete_id" required
+              class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition"></select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">Tipo</label>
+            <select id="tipo_movimento" required
+              class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition">
+              <option value="RETIRADA">Retirada</option>
+              <option value="DEVOLUCAO">Devolução</option>
+              <option value="INVENTARIO_AJUSTE">Ajuste de inventário</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">Quantidade</label>
+            <input id="quantidade" type="number" min="1" required placeholder="0"
+              class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">Cliente / destino</label>
+            <input id="cliente_destino" type="text" placeholder="Opcional"
+              class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">Responsável que retirou</label>
+            <input id="responsavel_retirou" type="text" placeholder="Nome"
+              class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-600 mb-1">Responsável que recebeu</label>
+            <input id="responsavel_recebeu" type="text" placeholder="Nome"
+              class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition" />
+          </div>
+
+          <div class="md:col-span-3">
+            <label class="block text-sm font-medium text-slate-600 mb-1">Observação</label>
+            <input id="observacao" type="text" placeholder="Opcional"
+              class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition" />
+          </div>
+
+          <div class="md:col-span-3 flex items-center justify-between flex-wrap gap-3">
+            <p id="form-msg" class="text-sm min-h-[20px]"></p>
+            <button type="submit"
+              class="px-6 py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold shadow-lg shadow-brand-500/30 transition">
+              Registrar movimentação
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- TABELA -->
+      <section class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <h2 class="text-lg font-bold text-slate-800">Últimas movimentações</h2>
+          <input id="filtro-busca" type="search" placeholder="Buscar por modelo, cliente, responsável..."
+            class="px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500 transition w-full sm:w-80 text-sm" />
+        </div>
+
+        <div class="overflow-x-auto -mx-6 px-6">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                <th class="py-3 pr-4">Data</th>
+                <th class="py-3 pr-4">Modelo</th>
+                <th class="py-3 pr-4">Tipo</th>
+                <th class="py-3 pr-4">Qtd</th>
+                <th class="py-3 pr-4">Cliente</th>
+                <th class="py-3 pr-4">Retirou</th>
+                <th class="py-3 pr-4">Recebeu</th>
+                <th class="py-3 pr-4">Última alteração</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-mov" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    // ======================================================
+    // CONFIGURAÇÃO — troque aqui
+    // ======================================================
+    const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
+    const SUPABASE_ANON_KEY = "SUA-ANON-KEY-AQUI";
+    const LOGIN_PAGE = 'login.html';
+
+    // ======================================================
+    // Helpers de tela
+    // ======================================================
+    const $ = (id) => document.getElementById(id);
+
+    function showLoading() {
+      $('loading').classList.remove('hidden');
+      $('error-screen').classList.add('hidden');
+      $('app-content').classList.add('hidden');
+    }
+
+    function showError(msg) {
+      $('loading').classList.add('hidden');
+      $('app-content').classList.add('hidden');
+      $('error-screen').classList.remove('hidden');
+      $('error-msg').textContent = msg;
+    }
+
+    function showApp() {
+      $('loading').classList.add('hidden');
+      $('error-screen').classList.add('hidden');
+      $('app-content').classList.remove('hidden');
+    }
+
+    function setMsg(el, text, type = 'err') {
+      el.textContent = text || '';
+      el.className = 'text-sm min-h-[20px] ' + (type === 'ok' ? 'text-emerald-600' : 'text-red-600');
+    }
+
+    function badgeTipo(tipo) {
+      const map = {
+        RETIRADA:          'bg-amber-50 text-amber-700 ring-amber-200',
+        DEVOLUCAO:         'bg-emerald-50 text-emerald-700 ring-emerald-200',
+        INVENTARIO_AJUSTE: 'bg-indigo-50 text-indigo-700 ring-indigo-200'
+      };
+      const label = { RETIRADA:'Retirada', DEVOLUCAO:'Devolução', INVENTARIO_AJUSTE:'Ajuste' }[tipo] || tipo;
+      return `<span class="inline-block px-2.5 py-1 rounded-full text-xs font-medium ring-1 ring-inset ${map[tipo] || 'bg-slate-100 text-slate-700'}">${label}</span>`;
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '-';
+      return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    // ======================================================
+    // Bootstrap
+    // ======================================================
+    (async function boot() {
+      try {
+        // Valida se o SDK carregou
+        if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+          return showError('Biblioteca Supabase não carregou. Verifique sua conexão com a internet.');
+        }
+
+        // Valida configuração
+        if (!SUPABASE_URL || SUPABASE_URL.includes('SEU-PROJETO') ||
+            !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes('SUA-ANON')) {
+          return showError('Configure SUPABASE_URL e SUPABASE_ANON_KEY no código antes de abrir esta página.');
+        }
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Timeout de segurança: se em 10s não resolver, volta pro login
+        const timeout = setTimeout(() => {
+          window.location.replace(LOGIN_PAGE);
+        }, 10000);
+
+        const { data: { session }, error } = await supabase.auth.getSession();
+        clearTimeout(timeout);
+
+        if (error) {
+          return showError('Erro ao verificar sessão: ' + error.message);
+        }
+
+        if (!session) {
+          window.location.replace(LOGIN_PAGE);
+          return;
+        }
+
+        // OK — mostra app e carrega dados
+        $('user-email').textContent = session.user.email;
+        showApp();
+
+        // ============ LOGOUT ============
+        $('btn-logout').addEventListener('click', async () => {
+          await supabase.auth.signOut();
+          window.location.replace(LOGIN_PAGE);
+        });
+
+        supabase.auth.onAuthStateChange((event) => {
+          if (event === 'SIGNED_OUT') window.location.replace(LOGIN_PAGE);
+        });
+
+        // ============ DADOS ============
+        async function carregarPaletes() {
+          const { data, error } = await supabase
+            .from('paletes').select('id, modelo').eq('ativo', true).order('modelo');
+          if (error) throw error;
+
+          const sel = $('palete_id');
+          sel.innerHTML = '<option value="">-- Selecione --</option>';
+          (data || []).forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.modelo;
+            sel.appendChild(opt);
+          });
+        }
+
+        async function carregarSaldo() {
+          const { data, error } = await supabase.from('vw_saldo_paletes').select('*').order('modelo');
+          if (error) throw error;
+
+          const grid = $('saldo-grid');
+          grid.innerHTML = '';
+
+          if (!data || !data.length) {
+            grid.innerHTML = '<p class="text-sm text-slate-400">Sem dados de saldo.</p>';
+            return;
+          }
+
+          data.forEach(s => {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-2xl border border-slate-100 shadow-sm p-5';
+            card.innerHTML = `
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-slate-800">${s.modelo}</h3>
+                <span class="text-xs px-2 py-1 rounded-full bg-brand-50 text-brand-700 font-medium">palete</span>
+              </div>
+              <div class="mt-4 grid grid-cols-2 gap-3">
+                <div class="bg-emerald-50 rounded-xl p-3">
+                  <p class="text-xs text-emerald-700 font-medium">Em estoque</p>
+                  <p class="text-2xl font-bold text-emerald-800">${s.saldo_estoque}</p>
+                </div>
+                <div class="bg-amber-50 rounded-xl p-3">
+                  <p class="text-xs text-amber-700 font-medium">Em cliente</p>
+                  <p class="text-2xl font-bold text-amber-800">${s.qtd_em_cliente}</p>
+                </div>
+              </div>
+            `;
+            grid.appendChild(card);
+          });
+        }
+
+        let movCache = [];
+
+        function renderMov(list) {
+          const tbody = $('tbody-mov');
+          tbody.innerHTML = '';
+
+          if (!list.length) {
+            tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-400 text-sm">Nenhuma movimentação registrada ainda.</td></tr>`;
+            return;
+          }
+
+          list.forEach(m => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50/80 transition';
+            tr.innerHTML = `
+              <td class="py-3 pr-4 whitespace-nowrap text-slate-700">${fmtDate(m.data_movimento)}</td>
+              <td class="py-3 pr-4 font-medium text-slate-800">${m.modelo ?? '-'}</td>
+              <td class="py-3 pr-4">${badgeTipo(m.tipo_movimento)}</td>
+              <td class="py-3 pr-4 font-semibold text-slate-800">${m.quantidade}</td>
+              <td class="py-3 pr-4 text-slate-600">${m.cliente_destino ?? '-'}</td>
+              <td class="py-3 pr-4 text-slate-600">${m.responsavel_retirou ?? '-'}</td>
+              <td class="py-3 pr-4 text-slate-600">${m.responsavel_recebeu ?? '-'}</td>
+              <td class="py-3 pr-4 text-slate-500 text-xs">
+                ${fmtDate(m.atualizado_em)}<br>
+                <span class="text-slate-400">${m.editor_email ?? '-'}</span>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+
+        async function carregarMovimentacoes() {
+          const { data, error } = await supabase
+            .from('vw_movimentacoes_detalhadas').select('*').limit(100);
+          if (error) throw error;
+          movCache = data || [];
+          renderMov(movCache);
+        }
+
+        $('filtro-busca').addEventListener('input', (e) => {
+          const q = e.target.value.toLowerCase().trim();
+          if (!q) return renderMov(movCache);
+          const filtered = movCache.filter(m =>
+            (m.modelo || '').toLowerCase().includes(q) ||
+            (m.cliente_destino || '').toLowerCase().includes(q) ||
+            (m.responsavel_retirou || '').toLowerCase().includes(q) ||
+            (m.responsavel_recebeu || '').toLowerCase().includes(q)
+          );
+          renderMov(filtered);
+        });
+
+        // ============ SUBMIT FORM ============
+        $('form-mov').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          setMsg($('form-msg'), '');
+
+          const payload = {
+            palete_id: Number($('palete_id').value),
+            tipo_movimento: $('tipo_movimento').value,
+            quantidade: Number($('quantidade').value),
+            cliente_destino: $('cliente_destino').value.trim() || null,
+            responsavel_retirou: $('responsavel_retirou').value.trim() || null,
+            responsavel_recebeu: $('responsavel_recebeu').value.trim() || null,
+            observacao: $('observacao').value.trim() || null
+          };
+
+          if (!payload.palete_id || !payload.quantidade) {
+            return setMsg($('form-msg'), 'Selecione o modelo e a quantidade.');
+          }
+
+          const { error } = await supabase.from('movimentacoes').insert(payload);
+          if (error) return setMsg($('form-msg'), 'Erro: ' + error.message);
+
+          setMsg($('form-msg'), 'Movimentação registrada com sucesso!', 'ok');
+          e.target.reset();
+          await Promise.all([ carregarSaldo(), carregarMovimentacoes() ]);
+        });
+
+        // ============ CARGA INICIAL DOS DADOS ============
+        try {
+          await Promise.all([ carregarPaletes(), carregarSaldo(), carregarMovimentacoes() ]);
+        } catch (err) {
+          console.error(err);
+          showError('Erro ao carregar dados: ' + (err.message || err) + '. Verifique se as tabelas/views foram criadas no Supabase.');
+        }
+
+      } catch (err) {
+        console.error(err);
+        showError('Erro inesperado: ' + (err.message || err));
+      }
+    })();
+  </script>
+</body>
+</html>
