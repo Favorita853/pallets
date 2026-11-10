@@ -60,43 +60,55 @@
   </div>
 
   <script>
-    // ======================================================
-    // CONFIGURAÇÃO — troque aqui
-    // ======================================================
-    const SUPABASE_URL = "https://wuimimulqttapjktemrc.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_lUa7OE-ANsA2Z5f-bKgxRw_9j1nrIrn";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // ======================================================
+  // CONFIGURAÇÃO
+  // ======================================================
+  const SUPABASE_URL = "https://wuimimulqttapjktemrc.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_lUa7OE-ANsA2Z5f-bKgxRw_9j1nrIrn"; // Apenas a chave pública
+  
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const $ = (id) => document.getElementById(id);
-    const msg = $('login-msg');
-    const btn = $('btn-login');
+  const $ = (id) => document.getElementById(id);
+  const msg = $('login-msg');
+  const btn = $('btn-login');
 
-    // Se já estiver logado, vai direto pro sistema
-    (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) window.location.replace('movimentacoes.html');
-    })();
-
-    $('form-login').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      msg.textContent = '';
-      btn.disabled = true;
-      btn.textContent = 'Entrando...';
-
-      const email = $('email').value.trim();
-      const password = $('password').value;
-
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-      if (error) {
-        msg.textContent = error.message;
-        btn.disabled = false;
-        btn.textContent = 'Entrar';
-        return;
-      }
-
+  // Verifica sessão antiga
+  (async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      alert("Você já está logado! Redirecionando para movimentacoes.html");
       window.location.replace('movimentacoes.html');
-    });
-  </script>
+    }
+  })();
+
+  $('form-login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    msg.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Entrando...';
+
+    const email = $('email').value.trim();
+    const password = $('password').value;
+
+    // TENTATIVA DE LOGIN
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      // MOSTRA O ERRO NA TELA E NO ALERT
+      alert("ERRO DO SUPABASE:\n" + error.message);
+      msg.textContent = error.message;
+      btn.disabled = false;
+      btn.textContent = 'Entrar';
+      return;
+    }
+
+    // SUCESSO NO LOGIN
+    alert("Login efetuado com sucesso! Vou tentar ir para movimentacoes.html agora.");
+    
+    // TENTA REDIRECIONAR
+    window.location.href = 'movimentacoes.html';
+  });
+</script>
 </body>
 </html>
