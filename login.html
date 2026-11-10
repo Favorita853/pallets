@@ -63,8 +63,8 @@
     // ======================================================
     // CONFIGURAÇÃO — troque aqui
     // ======================================================
-    const SUPABASE_URL = "https://SEU-PROJETO.supabase.co";
-    const SUPABASE_ANON_KEY = "SUA-ANON-KEY-AQUI";
+    const SUPABASE_URL = "https://wuimimulqttapjktemrc.supabase.co";
+    const SUPABASE_ANON_KEY = "SUAsb_publishable_lUa7OE-ANsA2Z5f-bKgxRw_9j1nrIrn";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const $ = (id) => document.getElementById(id);
@@ -74,7 +74,7 @@
     // Se já estiver logado, vai direto pro sistema
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) window.location.replace('movimentacoes.html');
+      if (session) window.location.replace('controle.html');
     })();
 
     $('form-login').addEventListener('submit', async (e) => {
@@ -95,7 +95,7 @@
         return;
       }
 
-      window.location.replace('movimentacoes.html');
+      window.location.replace('controle.html');
     });
   </script>
 </body>
